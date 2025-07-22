@@ -37,3 +37,12 @@ def retrieve_messages(recipient):
     rows = cursor.fetchall()
     conn.close()
     return rows
+
+
+def get_messages_for_user(recipient):
+    conn = sqlite3.connect("data/messages.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT sender, message FROM messages WHERE recipient = ?", (recipient,))
+    messages = cursor.fetchall()
+    conn.close()
+    return messages
