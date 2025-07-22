@@ -1,28 +1,68 @@
+import sqlite3
+import hashlib
 import os
-from core.crypto_utils import generate_rsa_keys
 
-USER_FOLDER = "data/users"
+DB_PATH = "data/users.db"
 
-def register_user(username):
-    os.makedirs(USER_FOLDER, exist_ok=True)
-    user_path = os.path.join(USER_FOLDER, username)
-    if os.path.exists(user_path):
-        return False, "User already exists."
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    return conn
 
-    os.makedirs(user_path)
-    private_key, public_key = generate_rsa_keys()
+def init_user_db():
+    # Create users database and table if not exist
+    if not os.path.exists("data"):
+        os.mkdir("data")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            public_key TEXT,
+            private_key TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-    with open(os.path.join(user_path, "private.pem"), "wb") as f:
-        f.write(private_key)
-    with open(os.path.join(user_path, "public.pem"), "wb") as f:
-        f.write(public_key)
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-    return True, "User registered successfully."
+def register_user(username, password):
+    init_user_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Check if user exists
+    cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
+    if cursor.fetchone():
+        conn.close()
+        raise Exception("Username already exists.")
+    # Hash the password and insert user
+    pwd_hash = hash_password(password)
+    cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, pwd_hash))
+    conn.commit()
+    conn.close()
+
+def authenticate_user(username, password):
+    init_user_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return False
+    stored_hash = row[0]
+    return stored_hash == hash_password(password)
 
 def get_keys(username):
-    user_path = os.path.join(USER_FOLDER, username)
-    with open(os.path.join(user_path, "private.pem"), "rb") as f:
-        private = f.read()
-    with open(os.path.join(user_path, "public.pem"), "rb") as f:
-        public = f.read()
-    return private, public
+    init_user_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT public_key, private_key FROM users WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row  # (public_key, private_key)
+    else:
+        raise Exception("User not found.")
