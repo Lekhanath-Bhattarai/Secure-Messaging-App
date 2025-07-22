@@ -35,7 +35,27 @@ def login():
     else:
         messagebox.showerror("Error", "Username and password required.")
 
+def open_login_window():
+    global login_window, entry_username, entry_password
+
+    login_window = tk.Tk()
+    login_window.title("Secure Messaging - Login/Register")
+
+    tk.Label(login_window, text="Username:").grid(row=0, column=0)
+    entry_username = tk.Entry(login_window)
+    entry_username.grid(row=0, column=1)
+
+    tk.Label(login_window, text="Password:").grid(row=1, column=0)
+    entry_password = tk.Entry(login_window, show="*")
+    entry_password.grid(row=1, column=1)
+
+    tk.Button(login_window, text="Register", command=register).grid(row=2, column=0, pady=10)
+    tk.Button(login_window, text="Login", command=login).grid(row=2, column=1)
+
+    login_window.mainloop()
+
 def open_chat_window():
+    global login_window
     login_window.destroy()
 
     chat = tk.Tk()
@@ -65,26 +85,17 @@ def open_chat_window():
         for sender, msg, ts in messages:
             chat_log.insert(tk.END, f"[{ts}] {sender}: {msg}\n")
 
+    def logout():
+        chat.destroy()
+        open_login_window()
+
     tk.Button(chat, text="Send", command=send_msg).grid(row=1, column=2, padx=5)
+    tk.Button(chat, text="Logout", command=logout).grid(row=0, column=3, padx=10)
     chat_log = scrolledtext.ScrolledText(chat, width=70, height=20)
-    chat_log.grid(row=2, column=0, columnspan=3, padx=5, pady=5)
+    chat_log.grid(row=2, column=0, columnspan=4, padx=5, pady=5)
 
     update_messages()
     chat.mainloop()
 
-# Login/Register window
-login_window = tk.Tk()
-login_window.title("Secure Messaging - Login/Register")
-
-tk.Label(login_window, text="Username:").grid(row=0, column=0)
-entry_username = tk.Entry(login_window)
-entry_username.grid(row=0, column=1)
-
-tk.Label(login_window, text="Password:").grid(row=1, column=0)
-entry_password = tk.Entry(login_window, show="*")
-entry_password.grid(row=1, column=1)
-
-tk.Button(login_window, text="Register", command=register).grid(row=2, column=0, pady=10)
-tk.Button(login_window, text="Login", command=login).grid(row=2, column=1)
-
-login_window.mainloop()
+# Start with login window
+open_login_window()
