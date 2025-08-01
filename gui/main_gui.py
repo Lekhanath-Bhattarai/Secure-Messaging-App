@@ -1,12 +1,18 @@
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
-
 import sys
 import os
+
+# Add project root to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from core.user_management import register_user, authenticate_user, get_keys
+from core.init_db import init_db
+from core.user_management import user_exists, init_user_db, register_user, authenticate_user
 from core.messaging import store_message, get_messages_for_user
+
+# Initialize databases
+init_db()
+init_user_db()
 
 current_user = None
 
@@ -69,15 +75,8 @@ def open_chat_window():
     entry_msg = tk.Entry(chat, width=50)
     entry_msg.grid(row=1, column=1, padx=5, pady=5)
 
-    def send_msg():
-        to_user = entry_to.get().strip()
-        msg = entry_msg.get().strip()
-        if to_user and msg:
-            store_message(current_user, to_user, msg)
-            entry_msg.delete(0, tk.END)
-            update_messages()
-        else:
-            messagebox.showerror("Error", "Both recipient and message required.")
+    chat_log = scrolledtext.ScrolledText(chat, width=70, height=20)
+    chat_log.grid(row=2, column=0, columnspan=4, padx=5, pady=5)
 
     def update_messages():
         chat_log.delete(1.0, tk.END)
@@ -85,17 +84,33 @@ def open_chat_window():
         for sender, msg, ts in messages:
             chat_log.insert(tk.END, f"[{ts}] {sender}: {msg}\n")
 
+    def send_msg():
+        to_user = entry_to.get().strip()
+        msg = entry_msg.get().strip()
+
+        if not to_user or not msg:
+            messagebox.showerror("Error", "Please enter recipient and message.")
+            return
+
+        if not user_exists(to_user):
+            messagebox.showerror("Error", f"User '{to_user}' does not exist.")
+            return
+
+        try:
+            store_message(current_user, to_user, msg)
+            entry_msg.delete(0, 'end')
+            update_messages()
+        except FileNotFoundError as e:
+            messagebox.showerror("Error", str(e))
+
     def logout():
         chat.destroy()
         open_login_window()
 
     tk.Button(chat, text="Send", command=send_msg).grid(row=1, column=2, padx=5)
     tk.Button(chat, text="Logout", command=logout).grid(row=0, column=3, padx=10)
-    chat_log = scrolledtext.ScrolledText(chat, width=70, height=20)
-    chat_log.grid(row=2, column=0, columnspan=4, padx=5, pady=5)
 
     update_messages()
     chat.mainloop()
 
-# Start with login window
 open_login_window()
