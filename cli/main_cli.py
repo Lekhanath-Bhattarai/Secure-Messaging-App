@@ -1,69 +1,110 @@
-from core.user_management import register_user, get_keys
-from core.crypto_utils import encrypt_message, decrypt_message
-from core.messaging import store_message, retrieve_messages
+import sys
+import os
+from datetime import datetime
 
-def menu():
-    print("\n--- Secure Messaging CLI ---")
-    print("1. Register User")
-    print("2. Encrypt and Send Message")
-    print("3. Read Messages")
-    print("4. Exit")
-    return input("Choose: ")
+# Add project root to path for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from core.init_db import init_db
+from core.user_management import user_exists, init_user_db, register_user, authenticate_user
+from core.messaging import store_message, get_messages_for_user
+
+# Initialize databases
+init_db()
+init_user_db()
+
+current_user = None
+
+def register():
+    username = input("Enter a username to register: ").strip()
+    password = input("Enter a password: ")
+    if username and password:
+        try:
+            register_user(username, password)
+            print(f"✅ User '{username}' registered successfully!\n")
+        except Exception as e:
+            print(f"❌ Registration failed: {str(e)}\n")
+    else:
+        print("❌ Username and password are required.\n")
+
+def login():
+    global current_user
+    username = input("Enter your username: ").strip()
+    password = input("Enter your password: ")
+    if username and password:
+        if authenticate_user(username, password):
+            current_user = username
+            print(f"✅ Welcome, {username}!\n")
+            open_chat()
+        else:
+            print("❌ Invalid username or password.\n")
+    else:
+        print("❌ Username and password are required.\n")
+
+def open_chat():
+    while True:
+        print("\n--- Secure Messaging CLI ---")
+        print("1. View messages")
+        print("2. Send message")
+        print("3. Logout")
+
+        choice = input("Select an option: ").strip()
+
+        if choice == '1':
+            view_messages()
+        elif choice == '2':
+            send_message()
+        elif choice == '3':
+            print("🔒 Logging out...\n")
+            break
+        else:
+            print("❌ Invalid option. Try again.")
+
+def view_messages():
+    print("\n📥 Your messages:\n")
+    messages = get_messages_for_user(current_user)
+    if messages:
+        for sender, msg, ts in messages:
+            print(f"[{ts}] {sender}: {msg}")
+    else:
+        print("No messages found.")
+
+def send_message():
+    to_user = input("Send to: ").strip()
+    msg = input("Message: ").strip()
+
+    if not to_user or not msg:
+        print("❌ Recipient and message are required.\n")
+        return
+
+    if not user_exists(to_user):
+        print(f"❌ User '{to_user}' does not exist.\n")
+        return
+
+    try:
+        store_message(current_user, to_user, msg)
+        print("✅ Message sent successfully.\n")
+    except FileNotFoundError as e:
+        print(f"❌ Error: {str(e)}\n")
 
 def main():
     while True:
-        choice = menu()
+        print("=== Secure Messaging CLI ===")
+        print("1. Register")
+        print("2. Login")
+        print("3. Exit")
+
+        choice = input("Select an option: ").strip()
+
         if choice == '1':
-            username = input("Enter username: ")
-            success, msg = register_user(username)
-            print(msg)
-
+            register()
         elif choice == '2':
-            sender = input("Your username: ")
-            receiver = input("Recipient username: ")
-            message = input("Message to send: ")
-
-            # Get recipient's public key
-            try:
-                _, receiver_pub = get_keys(receiver)
-            except FileNotFoundError:
-                print(f"Recipient '{receiver}' not found.")
-                continue
-
-            encrypted = encrypt_message(message, receiver_pub)
-            # Store the encrypted message as stringified dict
-            store_message(sender, receiver, str(encrypted))
-            print("Encrypted message sent and stored.")
-
+            login()
         elif choice == '3':
-            username = input("Enter your username to read messages: ")
-            msgs = retrieve_messages(username)
-            if not msgs:
-                print("No messages found.")
-                continue
-
-            # Get user's private key
-            try:
-                private_key, _ = get_keys(username)
-            except FileNotFoundError:
-                print(f"User '{username}' not found.")
-                continue
-
-            print(f"\nMessages for {username}:")
-            for sender, encrypted_str, timestamp in msgs:
-                encrypted = eval(encrypted_str)  # convert string back to dict
-                try:
-                    decrypted = decrypt_message(encrypted, private_key)
-                except Exception as e:
-                    decrypted = "[Failed to decrypt]"
-                print(f"From: {sender} at {timestamp}\nMessage: {decrypted}\n")
-
-        elif choice == '4':
-            print("Exiting...")
+            print("👋 Exiting. Goodbye!")
             break
-
         else:
-            print("Invalid choice. Try again.")
+            print("❌ Invalid choice. Please try again.\n")
 
 if __name__ == "__main__":
     main()
